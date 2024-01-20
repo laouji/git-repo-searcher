@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 const headerAccept = "application/vnd.github+json"
@@ -24,8 +25,8 @@ type client struct {
 	baseURL     string
 }
 
-func NewClient(httpClient *http.Client, baseURL string) Client {
-	return &client{httpClient, baseURL}
+func NewClient(clientTimeout time.Duration, baseURL string) Client {
+	return &client{&http.Client{Timeout: clientTimeout}, baseURL}
 }
 func (c *client) do(req *http.Request) (res *http.Response, err error) {
 	req.Header.Add("Accept", headerAccept)
