@@ -86,7 +86,7 @@ func (s *subRequesterTestSuite) TestCollect_FilterByLanguage() {
 		"Rust": "333",
 	}, nil)
 
-	filters := map[string]string{"language": "Ruby"}
+	filters := map[string]string{"language": "JavaScript"}
 	out, err := subRequester.Collect(context.Background(), repos, filters)
 	s.NoError(err)
 	s.Require().Len(out, 2)
