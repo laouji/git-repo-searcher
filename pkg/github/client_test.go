@@ -15,8 +15,7 @@ import (
 
 type clientTestSuite struct {
 	suite.Suite
-	server     *httptest.Server
-	httpClient *http.Client
+	server *httptest.Server
 
 	repos []github.Repository
 }
@@ -26,7 +25,6 @@ func TestClient(t *testing.T) {
 }
 
 func (s *clientTestSuite) SetupTest() {
-	s.httpClient = &http.Client{Timeout: 500 * time.Millisecond}
 	languageHandlerFn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"Ruby": 644}`))
 	})
@@ -52,7 +50,7 @@ func (s *clientTestSuite) TestListRepos_Success() {
 		w.Write(b)
 	})
 	server := httptest.NewServer(repoHandlerFn)
-	client := github.NewClient(s.httpClient, server.URL)
+	client := github.NewClient(500*time.Millisecond, server.URL)
 	repos, err := client.ListPublicRepos(context.Background(), expectedSince)
 	s.NoError(err)
 	s.Require().Len(repos, len(s.repos))
@@ -66,7 +64,7 @@ func (s *clientTestSuite) TestListRepos_InternalServerErrorResponse() {
 		w.Write([]byte("some error code"))
 	})
 	server := httptest.NewServer(repoHandlerFn)
-	client := github.NewClient(s.httpClient, server.URL)
+	client := github.NewClient(500*time.Millisecond, server.URL)
 	_, err := client.ListPublicRepos(context.Background(), int64(2))
 	s.Require().Error(err)
 	s.Regexp(http.StatusInternalServerError, err.Error())
@@ -79,7 +77,7 @@ func (s *clientTestSuite) TestListRepos_ContextCancel() {
 		w.Write([]byte("client hung up before response"))
 	})
 	server := httptest.NewServer(repoHandlerFn)
-	client := github.NewClient(s.httpClient, server.URL)
+	client := github.NewClient(500*time.Millisecond, server.URL)
 	_, err := client.ListPublicRepos(ctx, int64(3333))
 	s.Require().Error(err)
 	s.Regexp("context cancel", err.Error())
@@ -98,7 +96,7 @@ func (s *clientTestSuite) TestListPublicEvents() {
 		w.Write(b)
 	})
 	server := httptest.NewServer(repoHandlerFn)
-	client := github.NewClient(s.httpClient, server.URL)
+	client := github.NewClient(500*time.Millisecond, server.URL)
 	repos, err := client.ListPublicEvents(context.Background(), 50, 1)
 	s.NoError(err)
 	s.Require().Len(repos, 3)
