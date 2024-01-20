@@ -3,12 +3,13 @@ package github_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/Scalingo/sclng-backend-test-v1/pkg/github"
+	"github.com/laouji/git-repo-searcher/pkg/github"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -40,7 +41,9 @@ func (s *clientTestSuite) TeardownTest() {
 }
 
 func (s *clientTestSuite) TestListRepos_Success() {
+	expectedSince := int64(77777)
 	repoHandlerFn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.Equal(fmt.Sprintf("since=%d", expectedSince), r.URL.RawQuery)
 		w.WriteHeader(http.StatusOK)
 		b, err := json.Marshal(s.repos)
 		if err != nil {
@@ -50,7 +53,7 @@ func (s *clientTestSuite) TestListRepos_Success() {
 	})
 	server := httptest.NewServer(repoHandlerFn)
 	client := github.NewClient(s.httpClient, server.URL)
-	repos, err := client.ListPublicRepos(context.Background())
+	repos, err := client.ListPublicRepos(context.Background(), expectedSince)
 	s.NoError(err)
 	s.Require().Len(repos, len(s.repos))
 	s.Equal(s.repos[0].Name, repos[0].Name)
@@ -64,7 +67,7 @@ func (s *clientTestSuite) TestListRepos_InternalServerErrorResponse() {
 	})
 	server := httptest.NewServer(repoHandlerFn)
 	client := github.NewClient(s.httpClient, server.URL)
-	_, err := client.ListPublicRepos(context.Background())
+	_, err := client.ListPublicRepos(context.Background(), int64(2))
 	s.Require().Error(err)
 	s.Regexp(http.StatusInternalServerError, err.Error())
 }
@@ -77,7 +80,26 @@ func (s *clientTestSuite) TestListRepos_ContextCancel() {
 	})
 	server := httptest.NewServer(repoHandlerFn)
 	client := github.NewClient(s.httpClient, server.URL)
-	_, err := client.ListPublicRepos(ctx)
+	_, err := client.ListPublicRepos(ctx, int64(3333))
 	s.Require().Error(err)
 	s.Regexp("context cancel", err.Error())
+}
+
+func (s *clientTestSuite) TestListPublicEvents() {
+	repoHandlerFn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := json.Marshal([]github.Event{
+			{Type: "CreateEvent"},
+			{Type: "PushEvent"},
+			{Type: "DeleteEvent"},
+		})
+		if err != nil {
+			s.Fail(err.Error())
+		}
+		w.Write(b)
+	})
+	server := httptest.NewServer(repoHandlerFn)
+	client := github.NewClient(s.httpClient, server.URL)
+	repos, err := client.ListPublicEvents(context.Background(), 50, 1)
+	s.NoError(err)
+	s.Require().Len(repos, 3)
 }

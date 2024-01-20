@@ -1,7 +1,7 @@
 package github
 
 type Repository struct {
-	ID               int    `json:"id"`
+	ID               int64  `json:"id"`
 	NodeID           string `json:"node_id"`
 	Name             string `json:"name"`
 	FullName         string `json:"full_name"`
