@@ -2,11 +2,16 @@ package subrequester
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/laouji/git-repo-searcher/pkg/github"
 	"github.com/laouji/git-repo-searcher/pkg/model"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	FilterKeyLanguage = "language"
 )
 
 type SubRequester struct {
@@ -48,7 +53,7 @@ func (s *SubRequester) Collect(
 	s.logger.Debugf("spawning %d workers", s.workerCount)
 	for i := 0; i <= s.workerCount; i++ {
 		wg.Add(1)
-		go s.runWorker(ctx, wg)
+		go s.runWorker(ctx, wg, filters)
 	}
 
 	done := make(chan struct{})
@@ -88,7 +93,11 @@ func (s *SubRequester) Collect(
 	return out, nil
 }
 
-func (s *SubRequester) runWorker(ctx context.Context, wg *sync.WaitGroup) {
+func (s *SubRequester) runWorker(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	filters map[string]string,
+) {
 	defer wg.Done()
 	for repo := range s.input {
 		select {
@@ -96,20 +105,32 @@ func (s *SubRequester) runWorker(ctx context.Context, wg *sync.WaitGroup) {
 			s.errs <- ctx.Err()
 			break
 		default:
-			s.fetchSingle(ctx, repo)
+			s.fetchSingle(ctx, repo, filters)
 		}
 	}
 }
 
-func (s *SubRequester) fetchSingle(ctx context.Context, repo github.Repository) {
+func (s *SubRequester) fetchSingle(
+	ctx context.Context,
+	repo github.Repository,
+	filters map[string]string,
+) {
 	attrs, err := s.client.FetchAttribute(ctx, repo.LanguagesURL)
 	if err != nil {
 		s.errs <- err
 	}
 
 	languages := make(map[string]model.Language)
-	for key, val := range attrs {
+	for k, val := range attrs {
+		key := strings.ToLower(k)
 		languages[key] = model.Language{Bytes: val}
+	}
+
+	// if a language filter is set check if this entry is relevant
+	if lang, ok := filters[FilterKeyLanguage]; ok {
+		if _, found := languages[strings.ToLower(lang)]; !found {
+			return
+		}
 	}
 
 	s.output <- model.Repository{
