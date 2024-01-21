@@ -14,6 +14,9 @@ type Config struct {
 	WorkerCount      int           `envconfig:"WORKER_COUNT" default:"50"`
 	GithubAppID      string        `envconfig:"GITHUB_APP_ID"`
 	GithubPrivateKey string        `envconfig:"GITHUB_PRIVATE_KEY"`
+
+	AuthInterval      time.Duration `envconfig:"AUTH_INTERVAL" default:"5m"`
+	AuthRefreshBuffer time.Duration `envconfig:"AUTH_REFRESH_BUFFER" default:"10m"`
 }
 
 func newConfig() (*Config, error) {

@@ -7,11 +7,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/Scalingo/go-handlers"
 	"github.com/Scalingo/go-utils/logger"
 	"github.com/golang-jwt/jwt"
+	"github.com/laouji/git-repo-searcher/pkg/authentication"
 	"github.com/laouji/git-repo-searcher/pkg/github"
 	"github.com/laouji/git-repo-searcher/pkg/handler"
 	"github.com/sirupsen/logrus"
@@ -30,7 +30,7 @@ func main() {
 	if cfg.GithubAppID != "" {
 		privateKey, err = readAPIPrivateKey(cfg.GithubPrivateKey)
 		if err != nil {
-			log.WithError(err).Error("Failed to read file: %s", cfg.GithubPrivateKey)
+			log.WithError(err).Errorf("Failed to read file: %s", cfg.GithubPrivateKey)
 			os.Exit(2)
 		}
 	}
@@ -62,8 +62,9 @@ func RunServer(
 	privateKey *rsa.PrivateKey,
 ) error {
 	githubClient := github.NewClient(cfg.ClientTimeout, cfg.GithubURL, cfg.GithubAppID, privateKey)
+	authenticator := authentication.NewAuthenticator(githubClient, log)
 
-	if err := Authenticate(ctx, githubClient, log); err != nil {
+	if err := authenticator.Authenticate(ctx, cfg.AuthInterval, cfg.AuthRefreshBuffer); err != nil {
 		return fmt.Errorf("failed to authenticate with github API: %w", err)
 	}
 
@@ -80,34 +81,5 @@ func RunServer(
 	if err != nil {
 		return fmt.Errorf("Failed to listen to the given port: %d", cfg.Port)
 	}
-	return nil
-}
-
-func Authenticate(ctx context.Context, githubClient github.Client, log logrus.FieldLogger) error {
-	token, err := githubClient.SetAccessToken(ctx)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		for {
-			select {
-			case <-ctx.Done():
-				ticker.Stop()
-				return
-
-			case <-ticker.C:
-				threshold := time.Now().UTC().Add(10 * time.Minute)
-				if threshold.After(token.ExpiresAt) {
-					log.Debug("refreshing github access token")
-					token, err = githubClient.SetAccessToken(ctx)
-					if err != nil {
-						log.WithError(err).Error("failed to reset access token")
-					}
-				}
-			}
-		}
-	}()
 	return nil
 }
