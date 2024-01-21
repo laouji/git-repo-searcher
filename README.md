@@ -1,14 +1,16 @@
 # Canvas for Backend Technical Test at Scalingo
 
-## Instructions
+## Prerequisites
 
-* From this canvas, respond to the project which has been communicated to you by our team
-* Feel free to change everything
+* You must have created a GitHub App
+* You must have generated a private key for this app and have it on your local machine
+* You must have clicked ["Install App"](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app) on GitHub and associated with your account
 
 ## Execution
 
 ```
-docker compose up
+export GITHUB_CLIENT_ID=${YOUR-CLIENT-ID}
+cat ${PATH-TO-YOUR-GITHUB-API-PRIVATE-KEY} > ./private_key.pem && make up
 ```
 
 Application will be then running on port `5000`

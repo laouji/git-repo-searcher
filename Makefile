@@ -14,4 +14,4 @@ deps:
 	go mod vendor
 	go mod tidy
 up:
-	docker-compose -p ${BINARY_NAME} up
+	docker compose -p ${BINARY_NAME} up

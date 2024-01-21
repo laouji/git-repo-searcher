@@ -84,3 +84,18 @@ func (mr *MockClientMockRecorder) ListPublicRepos(ctx, since any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPublicRepos", reflect.TypeOf((*MockClient)(nil).ListPublicRepos), ctx, since)
 }
+
+// SetAccessToken mocks base method.
+func (m *MockClient) SetAccessToken(ctx context.Context) (github.Token, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetAccessToken", ctx)
+	ret0, _ := ret[0].(github.Token)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetAccessToken indicates an expected call of SetAccessToken.
+func (mr *MockClientMockRecorder) SetAccessToken(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAccessToken", reflect.TypeOf((*MockClient)(nil).SetAccessToken), ctx)
+}

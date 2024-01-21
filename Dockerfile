@@ -7,4 +7,4 @@ WORKDIR $GOPATH/src/github.com/laouji/git-repo-searcher
 
 EXPOSE 5000
 
-CMD $GOPATH/bin/sclng-backend-test-v1
+CMD $GOPATH/bin/git-repo-searcher
