@@ -37,7 +37,7 @@ func (s *subRequesterTestSuite) TestCollect_NoFilters() {
 	}
 	subRequester := subrequester.NewSubRequester(3, s.clientMock, logger.Default())
 
-	sampleAttribute := map[string]string{}
+	sampleAttribute := map[string]int64{}
 	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[0].LanguagesURL).Return(sampleAttribute, nil)
 	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[1].LanguagesURL).Return(sampleAttribute, nil)
 	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[2].LanguagesURL).Return(sampleAttribute, nil)
@@ -56,7 +56,7 @@ func (s *subRequesterTestSuite) TestCollect_APIErrors() {
 	}
 
 	expectedErr := errors.New("error")
-	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), expectedURL).Return(map[string]string{}, expectedErr)
+	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), expectedURL).Return(map[string]int64{}, expectedErr)
 	_, err := subRequester.Collect(context.Background(), repos, map[string]string{})
 	s.Require().Error(err)
 	s.Equal(expectedErr, err)
@@ -71,19 +71,19 @@ func (s *subRequesterTestSuite) TestCollect_FilterByLanguage() {
 	}
 	subRequester := subrequester.NewSubRequester(3, s.clientMock, logger.Default())
 
-	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[0].LanguagesURL).Return(map[string]string{
-		"Ruby":       "3434",
-		"Javascript": "229",
+	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[0].LanguagesURL).Return(map[string]int64{
+		"Ruby":       3434,
+		"Javascript": 229,
 	}, nil)
-	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[1].LanguagesURL).Return(map[string]string{
-		"Go": "799",
+	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[1].LanguagesURL).Return(map[string]int64{
+		"Go": 799,
 	}, nil)
-	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[2].LanguagesURL).Return(map[string]string{
-		"Javascript": "333",
-		"CSS":        "1223",
+	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[2].LanguagesURL).Return(map[string]int64{
+		"Javascript": 333,
+		"CSS":        1223,
 	}, nil)
-	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[3].LanguagesURL).Return(map[string]string{
-		"Rust": "333",
+	s.clientMock.EXPECT().FetchAttribute(gomock.Any(), repos[3].LanguagesURL).Return(map[string]int64{
+		"Rust": 333,
 	}, nil)
 
 	filters := map[string]string{"language": "JavaScript"}

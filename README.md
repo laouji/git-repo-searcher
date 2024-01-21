@@ -10,13 +10,22 @@
 
 ## Execution
 
-Find the client ID for your Github App at the top of the App Settings page in Github
+The most basic usage is to run the web server using the up command:
+```
+$ make up
+```
+
+While you can run this application without setting any environment variables, you will quickly notice that is easy to hit the GitHub API rate-limit unless you pass github authentication credentials into the app and allow it to authenticate.
+
+1. Find the client ID for your Github App at the top of the App Settings page in Github
+
 (Settings -> Developer settings  -> GitHub Apps -> YOUR APP)
 
-From the home directory of the project execute the following
+2. From the same GitHub page generate and download a private key with the .pem extension
+
+3. From the home directory of the project execute the following:
 ```
-export GITHUB_CLIENT_ID=${YOUR-CLIENT-ID}
-cat ${PATH-TO-YOUR-GITHUB-API-PRIVATE-KEY} > ./private_key.pem && make up
+$ export GITHUB_APP_ID=${YOUR-CLIENT-ID} && cat ${PATH-TO-YOUR-GITHUB-API-PRIVATE-KEY} > ./private_key.pem && make up
 ```
 
 Application will be then running on port `5000`
@@ -30,7 +39,9 @@ $ curl localhost:5000/ping
 
 ## Usage
 
-### Repositories
+### View Recent Repositories
+
+##### Basic usage
 
 This endpoint will return the most recent 100 repositories on GitHub when called without any filters
 
@@ -41,6 +52,8 @@ $ curl localhost:5000/repos
 ...
 ]
 ```
+
+##### Search using filters
 
 Additionally you can filter by language. This will limit the number of results to only those which are known to use the language specified in the query parameter.
 

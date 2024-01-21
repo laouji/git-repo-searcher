@@ -41,10 +41,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // FetchAttribute mocks base method.
-func (m *MockClient) FetchAttribute(ctx context.Context, url string) (map[string]string, error) {
+func (m *MockClient) FetchAttribute(ctx context.Context, url string) (map[string]int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FetchAttribute", ctx, url)
-	ret0, _ := ret[0].(map[string]string)
+	ret0, _ := ret[0].(map[string]int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
