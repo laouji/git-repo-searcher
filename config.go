@@ -1,12 +1,17 @@
 package main
 
 import (
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 )
 
 type Config struct {
-	Port int `envconfig:"PORT" default:"5000"`
+	Port          int           `envconfig:"PORT" default:"5000"`
+	GithubURL     string        `envconfig:"GITHUB_API_URL" default:"https://api.github.com"`
+	ClientTimeout time.Duration `envconfig:"CLIENT_TIMEOUT" default:"1s"`
+	WorkerCount   int           `envconfig:"WORKER_COUNT" default:"50"`
 }
 
 func newConfig() (*Config, error) {

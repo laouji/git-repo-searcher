@@ -1,13 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 
 	"github.com/Scalingo/go-handlers"
 	"github.com/Scalingo/go-utils/logger"
+	"github.com/laouji/git-repo-searcher/pkg/github"
+	"github.com/laouji/git-repo-searcher/pkg/handler"
+	"github.com/laouji/git-repo-searcher/pkg/searcher"
+	"github.com/laouji/git-repo-searcher/pkg/subrequester"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -15,34 +19,33 @@ func main() {
 	log.Info("Initializing app")
 	cfg, err := newConfig()
 	if err != nil {
-		log.WithError(err).Error("Fail to initialize configuration")
+		log.WithError(err).Error("Failed to initialize configuration")
 		os.Exit(1)
 	}
 
-	log.Info("Initializing routes")
-	router := handlers.NewRouter(log)
-	router.HandleFunc("/ping", pongHandler)
-	// Initialize web server and configure the following routes:
-	// GET /repos
-	// GET /stats
-
-	log = log.WithField("port", cfg.Port)
-	log.Info("Listening...")
-	err = http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), router)
-	if err != nil {
-		log.WithError(err).Error("Fail to listen to the given port")
+	if err := RunServer(cfg, log); err != nil {
+		log.WithError(err).Error("Failed to run web server")
 		os.Exit(2)
 	}
 }
 
-func pongHandler(w http.ResponseWriter, r *http.Request, _ map[string]string) error {
-	log := logger.Get(r.Context())
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+func RunServer(cfg *Config, log logrus.FieldLogger) error {
+	githubClient := github.NewClient(cfg.ClientTimeout, cfg.GithubURL)
+	repoSearcher := searcher.NewSearcher(githubClient)
+	subRequester := subrequester.NewSubRequester(cfg.WorkerCount, githubClient, log)
 
-	err := json.NewEncoder(w).Encode(map[string]string{"status": "pong"})
+	log.Info("Initializing routes")
+	router := handlers.NewRouter(log)
+	router.HandleFunc("/ping", handler.Pong)
+	// Initialize web server and configure the following routes:
+	router.HandleFunc("/repos", handler.Repos(repoSearcher, subRequester))
+	// GET /stats
+
+	log = log.WithField("port", cfg.Port)
+	log.Info("Listening...")
+	err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), router)
 	if err != nil {
-		log.WithError(err).Error("Fail to encode JSON")
+		return fmt.Errorf("Failed to listen to the given port: %d", cfg.Port)
 	}
 	return nil
 }
