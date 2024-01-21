@@ -27,6 +27,12 @@ var (
 	ErrRateLimit       = errors.New("github API rate limit reached")
 	ErrAppNotInstalled = errors.New("github app is not installed")
 
+	defaultStatusAllowedFn = func(status int) bool {
+		if status > 399 {
+			return false
+		}
+		return true
+	}
 	reInstallation = regexp.MustCompile("^/app/installations")
 )
 
@@ -76,8 +82,7 @@ func (c *client) generateJWT() (string, error) {
 		"iat": now.Unix(),
 		"exp": now.Add(5 * time.Minute).Unix(),
 		"iss": c.appID,
-		"alg": "RS256",
-		//"alg": jwt.SigningMethodRS256.Alg(),
+		"alg": jwt.SigningMethodRS256.Alg(),
 	})
 	return token.SignedString(c.privateKey)
 }
@@ -107,7 +112,10 @@ func (c *client) addAuthHeader(req *http.Request) (err error) {
 	return nil
 }
 
-func (c *client) do(req *http.Request) (res *http.Response, err error) {
+func (c *client) do(
+	req *http.Request,
+	statusAllowedFn func(status int) bool,
+) (res *http.Response, err error) {
 	if err := c.addAuthHeader(req); err != nil {
 		return res, fmt.Errorf("failed to add auth header for app %q: %w", c.appID, err)
 	}
@@ -118,10 +126,10 @@ func (c *client) do(req *http.Request) (res *http.Response, err error) {
 	if err != nil {
 		return res, fmt.Errorf("failed to do request: %w", err)
 	}
-	if res.StatusCode > 399 {
+	if !statusAllowedFn(res.StatusCode) {
 		switch res.StatusCode {
-		//		case http.StatusUnauthorized:
-		//			return res, ErrAuthentication
+		case http.StatusUnauthorized:
+			return res, ErrAuthentication
 		case http.StatusForbidden:
 			return res, ErrRateLimit
 		}
@@ -152,7 +160,7 @@ func (c *client) ListPublicRepos(
 	q.Add("since", strconv.FormatInt(since, 10))
 	req.URL.RawQuery = q.Encode()
 
-	res, err := c.do(req)
+	res, err := c.do(req, defaultStatusAllowedFn)
 	if err != nil {
 		return repos, fmt.Errorf("failed to do request to %s: %w", path, err)
 	}
@@ -193,7 +201,7 @@ func (c *client) ListPublicEvents(
 		return events, fmt.Errorf("failed to create request to %s: %w", path, err)
 	}
 
-	res, err := c.do(req)
+	res, err := c.do(req, defaultStatusAllowedFn)
 	if err != nil {
 		return events, fmt.Errorf("failed to do request to %s: %w", path, err)
 	}
@@ -218,9 +226,21 @@ func (c *client) FetchAttribute(ctx context.Context, url string) (attributes map
 	if err != nil {
 		return attributes, fmt.Errorf("failed to create request to %s: %w", url, err)
 	}
-	res, err := c.do(req)
+	res, err := c.do(req, func(status int) bool {
+		acceptedStatuses := map[int]struct{}{
+			http.StatusOK:       {},
+			http.StatusNotFound: {},
+		}
+		_, ok := acceptedStatuses[status]
+		return ok
+	})
 	if err != nil {
 		return attributes, fmt.Errorf("failed to do request to %s: %w", url, err)
+	}
+
+	// sometimes repos don't have a resource of this type attached to them
+	if res.StatusCode == http.StatusNotFound {
+		return attributes, nil
 	}
 
 	b, err := ioutil.ReadAll(res.Body)
@@ -252,7 +272,7 @@ func (c *client) SetAccessToken(ctx context.Context) (token Token, err error) {
 	if err != nil {
 		return token, fmt.Errorf("failed to create request to %s: %w", c.tokenRefreshURL, err)
 	}
-	res, err := c.do(req)
+	res, err := c.do(req, defaultStatusAllowedFn)
 	if err != nil {
 		return token, fmt.Errorf("failed to do request to %s: %w", c.tokenRefreshURL, err)
 	}
@@ -280,7 +300,7 @@ func (c *client) setTokenRefreshURL(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create request to %s: %w", path, err)
 	}
-	res, err := c.do(req)
+	res, err := c.do(req, defaultStatusAllowedFn)
 	if err != nil {
 		return fmt.Errorf("failed to do request to %s: %w", path, err)
 	}

@@ -14,6 +14,10 @@ const (
 	FilterKeyLanguage = "language"
 )
 
+var PermittedFilterKeys = map[string]struct{}{
+	FilterKeyLanguage: {},
+}
+
 type SubRequester struct {
 	workerCount int
 
@@ -48,6 +52,7 @@ func (s *SubRequester) Collect(
 	filters map[string]string,
 ) (out []model.Repository, err error) {
 	wg := &sync.WaitGroup{}
+	out = make([]model.Repository, 0, len(in))
 
 	// fan out to multiple workers to make time consuming requests
 	s.logger.Debugf("spawning %d workers", s.workerCount)

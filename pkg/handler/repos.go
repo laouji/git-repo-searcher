@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/Scalingo/go-handlers"
 	"github.com/Scalingo/go-utils/logger"
@@ -14,9 +15,11 @@ import (
 )
 
 func Repos(
-	repoSearcher *searcher.Searcher,
-	subRequester *subrequester.SubRequester,
+	log logrus.FieldLogger,
+	githubClient github.Client,
+	workerCount int,
 ) handlers.HandlerFunc {
+	repoSearcher := searcher.NewSearcher(githubClient)
 	return func(w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 		log := logger.Get(r.Context())
 
@@ -26,9 +29,8 @@ func Repos(
 			return err
 		}
 
-		// TODO filters
-		filters := make(map[string]string)
-		out, err := subRequester.Collect(r.Context(), repos, filters)
+		subRequester := subrequester.NewSubRequester(workerCount, githubClient, log)
+		out, err := subRequester.Collect(r.Context(), repos, filters(r))
 		if err != nil {
 			errorResponse(w, log, http.StatusInternalServerError, err)
 			return err
@@ -44,6 +46,19 @@ func Repos(
 		}
 		return nil
 	}
+}
+
+func filters(r *http.Request) map[string]string {
+	filters := make(map[string]string)
+
+	queryParams := r.URL.Query()
+	for key, _ := range subrequester.PermittedFilterKeys {
+		k := strings.ToLower(key)
+		if val := queryParams.Get(k); len(val) > 0 {
+			filters[k] = val
+		}
+	}
+	return filters
 }
 
 func errorResponse(w http.ResponseWriter, log logrus.FieldLogger, status int, err error) {
