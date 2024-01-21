@@ -131,11 +131,22 @@ func (s *SubRequester) fetchSingle(
 		languages[key] = model.Language{Bytes: val}
 	}
 
+	relevant := true
+
 	// if a language filter is set check if this entry is relevant
-	if lang, ok := filters[FilterKeyLanguage]; ok {
-		if _, found := languages[strings.ToLower(lang)]; !found {
-			return
+	if langs, ok := filters[FilterKeyLanguage]; ok {
+		relevant = false
+		for _, l := range strings.Split(strings.ToLower(langs), ",") {
+			if _, found := languages[l]; found {
+				relevant = true
+				break
+			}
 		}
+	}
+
+	// discard any entries that don't match the filters
+	if !relevant {
+		return
 	}
 
 	s.output <- model.Repository{
