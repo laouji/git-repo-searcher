@@ -1,10 +1,18 @@
-version: '3'
+version: '3.1'
 services:
   web:
     build: .
     volumes:
-      - ./:/go/src/github.com/Scalingo/sclng-backend-test-v1
+      - ./:/go/src/github.com/laouji/git-repo-searcher
     ports:
       - "5000:5000"
-    command: reflex -r '\.go$$' -s -- sh -c 'go build -buildvcs=false && ./sclng-backend-test-v1'
+    command: reflex -r '\.go$$' -s -- sh -c 'make build && ./${COMPOSE_PROJECT_NAME}'
     stop_signal: SIGKILL
+    secrets:
+      - github_private_key
+    environment:
+      GITHUB_PRIVATE_KEY: /run/secrets/github_private_key 
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+secrets:
+  github_private_key:
+    file: ./private_key.pem
