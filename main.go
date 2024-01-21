@@ -14,8 +14,6 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/laouji/git-repo-searcher/pkg/github"
 	"github.com/laouji/git-repo-searcher/pkg/handler"
-	"github.com/laouji/git-repo-searcher/pkg/searcher"
-	"github.com/laouji/git-repo-searcher/pkg/subrequester"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,14 +67,11 @@ func RunServer(
 		return fmt.Errorf("failed to authenticate with github API: %w", err)
 	}
 
-	repoSearcher := searcher.NewSearcher(githubClient)
-	subRequester := subrequester.NewSubRequester(cfg.WorkerCount, githubClient, log)
-
 	log.Info("Initializing routes")
 	router := handlers.NewRouter(log)
 	router.HandleFunc("/ping", handler.Pong)
 	// Initialize web server and configure the following routes:
-	router.HandleFunc("/repos", handler.Repos(repoSearcher, subRequester))
+	router.HandleFunc("/repos", handler.Repos(log, githubClient, cfg.WorkerCount))
 	// GET /stats
 
 	log = log.WithField("port", cfg.Port)
