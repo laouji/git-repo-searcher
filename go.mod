@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/Scalingo/go-handlers v1.8.1
 	github.com/Scalingo/go-utils/logger v1.2.0
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
