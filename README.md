@@ -67,3 +67,35 @@ $ curl localhost:5000/repos?language=ruby,python
 ...
 ]
 ```
+
+## Configuration
+
+Here are some environment variables that can be used to tweak the application performance
+
+#### WORKER_COUNT
+
+number of workers which can make concurrent requests to fetch language data for repos
+
+#### AUTH_INTERVAL
+
+a duration which marks how often the application attempts to refresh the auth token
+
+## Design Considerations
+
+The project is divided into 4 main components:
+
+* Github Client - for isolating business logic related to GitHub's API and managing API requests
+* Authenticator - for managing the authentication lifecycle and refresh of GitHub API tokens
+* Searcher - for discovering repositories relevant to the search
+* Subrequester - for making subsequent requests concurrently via multiple workers
+
+#### Approach
+
+The application uses the [list public events API](https://docs.github.com/en/rest/activity/events?apiVersion=2022-11-28#list-public-events) to first search for the latest repository_id (n) and then use that number to calculate the n-100th repository.
+
+It is then able to pass that repository_id as the 'since' value to the [list public repositories API](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-public-repositories). This approach was taken because the list public repositories API does not expose a sorting mechanism which would allow repositories to be fetched in descending order.
+
+A caveat to this is that the list public repos API response does not include all the details about a repository (like licence information for example), so we are not able to extract as many details that might be interesting to filter by.
+However the advantage of being able to get all 100 repositories in one HTTP call is significant in terms of both speed and also avoiding maxing out the rate-limit.
+
+The rate-limit in particular is a significant limitation in terms of the scaling of this application. Although using proper authentication methods does increase the rate-limit, we have to keep in mind that we are only granted 5K req/h (see: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28) so horizontally scaling of this application would quickly cause it to be throttled.
