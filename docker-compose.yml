@@ -7,7 +7,6 @@ services:
     ports:
       - "5000:5000"
     command: reflex -r '\.go$$' -s -- sh -c 'make build && ./${COMPOSE_PROJECT_NAME}'
-    stop_signal: SIGKILL
     secrets:
       - github_private_key
     environment:

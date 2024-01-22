@@ -102,6 +102,8 @@ The rate-limit in particular is a significant limitation in terms of the scaling
 
 ### Next steps
 
+#### Caching
+
 Caching would be an obvious next step towards optimising this application. Currently all requests (with exception of authentication which has its own lifecycle) are being triggered via the /repos handler and no effort to reuse results is made.
 
 In order to determine if caching would be effective we'd first have to better define the criteria for 'latest repos' and also better understand the typical use patterns of the app.
@@ -109,6 +111,14 @@ Since git repositories are being created on the fly all the time, two subsequent
 
 However, if for example the users are not literally interested only in the most recent 100 repositories, but more generally in repositories that have been created in the last hour or so, we could potentially create a cache that stores historical data.
 This could expand on the usefulness of the ?languages filter, which instead of returning only those entries of the most recent 100 which match the language, could instead return the last 100 repositories matching that criteria within a particular time frame.
+
+#### Graceful Shutdown
+
+The docker-compose configuration was initially configured to send a SIGKILL to the application, however with web servers it is a typical practice to attempt to wait for underlying goroutines to avoid abruptly hanging up on HTTP clients still connected to the server.
+
+The handling surrounding ListenAndServe has been modified to allow the catching of SIGTERM / SIGINT and attempt to close the webserver.
+
+The SIGKILL directive in the docker-compose configuration has been removed so that it will now default to sending and initial SIGTERM directive to give the application a chance to shutdown gracefully.
 
 ### Regarding filters
 
