@@ -17,6 +17,8 @@ type Config struct {
 
 	AuthInterval      time.Duration `envconfig:"AUTH_INTERVAL" default:"5m"`
 	AuthRefreshBuffer time.Duration `envconfig:"AUTH_REFRESH_BUFFER" default:"10m"`
+
+	ShutdownTimeout time.Duration `envconfig:"SHUTDOWN_TIMEOUT" default:"5s"`
 }
 
 func newConfig() (*Config, error) {

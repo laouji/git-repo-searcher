@@ -33,7 +33,7 @@ Application will be then running on port `5000`
 ## Test
 
 ```
-$ curl localhost:5000/ping
+$ curl 'localhost:5000/ping'
 { "status": "pong" }
 ```
 
@@ -46,7 +46,7 @@ $ curl localhost:5000/ping
 This endpoint will return the most recent 100 repositories on GitHub when called without any filters
 
 ```
-$ curl localhost:5000/repos
+$ curl 'localhost:5000/repos'
 [
  {"full_name":"ownerName/repoName","owner":"ownerName","repository":"repoName","languages":{"html":{"bytes":564},"javascript":{"bytes":6469},"scss":{"bytes":3074}}},
 ...
@@ -60,7 +60,7 @@ Additionally you can filter by language. This will limit the number of results t
 It will return info about repos that contain more than one language as long as at least one of them matches a language specified in the filter. You can specify more than one language to search for by concatenating with a comma.
 
 ```
-$ curl localhost:5000/repos?language=ruby,python
+$ curl 'localhost:5000/repos?language=ruby,python'
 [
  {"full_name":"ownerName/repoName","owner":"ownerName","repository":"repoName","languages":{"python":{"bytes":4932}}},
  {"full_name":"ownerName/repoName","owner":"ownerName","repository":"repoName","languages":{"html":{"bytes":564},"ruby":{"bytes":6469},"scss":{"bytes":3074}}},
@@ -74,7 +74,7 @@ Here are some environment variables that can be used to tweak the application pe
 
 #### WORKER_COUNT
 
-number of workers which can make concurrent requests to fetch language data for repos
+number of workers (per search request) which can make concurrent requests to fetch language data for repos
 
 #### AUTH_INTERVAL
 
@@ -98,4 +98,36 @@ It is then able to pass that repository_id as the 'since' value to the [list pub
 A caveat to this is that the list public repos API response does not include all the details about a repository (like licence information for example), so we are not able to extract as many details that might be interesting to filter by.
 However the advantage of being able to get all 100 repositories in one HTTP call is significant in terms of both speed and also avoiding maxing out the rate-limit.
 
-The rate-limit in particular is a significant limitation in terms of the scaling of this application. Although using proper authentication methods does increase the rate-limit, we have to keep in mind that we are only granted 5K req/h (see: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28) so horizontally scaling of this application would quickly cause it to be throttled.
+The rate-limit in particular is a significant limitation in terms of the scaling of this application. Although using proper authentication methods does increase the rate-limit, we have to keep in mind that we are only granted 5K req/h (see: [docs on rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28)) so horizontally scaling of this application would quickly cause it to be throttled.
+
+### Next steps
+
+#### Caching
+
+Caching would be an obvious next step towards optimising this application. Currently all requests (with exception of authentication which has its own lifecycle) are being triggered via the /repos handler and no effort to reuse results is made.
+
+In order to determine if caching would be effective we'd first have to better define the criteria for 'latest repos' and also better understand the typical use patterns of the app.
+Since git repositories are being created on the fly all the time, two subsequent requests to the /repos endpoint are unlikely to yield the same result set. If the emphasis is really on having the latest repos then caching is unlikely to have a huge impact as most of the data would already be stale by the time it is saved in the cache.
+
+However, if for example the users are not literally interested only in the most recent 100 repositories, but more generally in repositories that have been created in the last hour or so, we could potentially create a cache that stores historical data.
+This could expand on the usefulness of the ?languages filter, which instead of returning only those entries of the most recent 100 which match the language, could instead return the last 100 repositories matching that criteria within a particular time frame.
+
+#### Graceful Shutdown
+
+The docker-compose configuration was initially configured to send a SIGKILL to the application, however with web servers it is a typical practice to attempt to wait for underlying goroutines to avoid abruptly hanging up on HTTP clients still connected to the server.
+
+The handling surrounding ListenAndServe has been modified to allow the catching of SIGTERM / SIGINT and attempt to close the webserver.
+
+The SIGKILL directive in the docker-compose configuration has been removed so that it will now default to sending and initial SIGTERM directive to give the application a chance to shutdown gracefully.
+
+### Regarding filters
+
+I only implemented a single ?languages filter for the following reasons:
+* licencing information was not available in the response of the [list public repositories API](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-public-repositories)
+* language was the only attribute visible in the requested API response
+* it was unclear from the task description which other data points (stargazers count, pull request count?) would be interesting to filter by
+* the description of the task put more emphasis on speed of response and scalability
+
+So, as mentioned above, I prioritised reducing the total number of requests to avoid being easily throttled by the API rate limit over adding additional filters.
+
+In a real world situation it would of course be important to fully analyse the user needs (eg. why the user is searching for repos and what kind of information they expect to find) before deciding on the final functionality / tradeoffs to be made.

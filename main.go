@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Scalingo/go-handlers"
 	"github.com/Scalingo/go-utils/logger"
@@ -35,12 +38,38 @@ func main() {
 		}
 	}
 
-	// TODO handle signals
-	ctx := context.Background()
-	if err := RunServer(ctx, cfg, log, privateKey); err != nil {
-		log.WithError(err).Error("Failed to run web server")
+	appCtx, cancel := context.WithCancel(context.Background())
+	server, err := configureServer(appCtx, cfg, log, privateKey)
+	if err != nil {
+		log.WithError(err).Error("Failed to configure web server")
 		os.Exit(2)
 	}
+
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		log.Info("Listening...")
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.WithError(err).Errorf("Failed to listen to the given port: %d", cfg.Port)
+			os.Exit(2)
+		}
+		log.Info("Web server stopped receiving new conns")
+	}()
+
+	// block until signal is received
+	<-signalCh
+	cancel() // stop authenticator loop
+
+	shutdownCtx, release := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer release()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.WithError(err).Error("Failed to gracefully shutdown server")
+		os.Exit(2)
+	}
+	log.Info("Graceful shutdown complete")
 }
 
 func readAPIPrivateKey(path string) (key *rsa.PrivateKey, err error) {
@@ -55,17 +84,17 @@ func readAPIPrivateKey(path string) (key *rsa.PrivateKey, err error) {
 	return jwt.ParseRSAPrivateKeyFromPEM(pemBytes)
 }
 
-func RunServer(
+func configureServer(
 	ctx context.Context,
 	cfg *Config,
 	log logrus.FieldLogger,
 	privateKey *rsa.PrivateKey,
-) error {
+) (*http.Server, error) {
 	githubClient := github.NewClient(cfg.ClientTimeout, cfg.GithubURL, cfg.GithubAppID, privateKey)
 	authenticator := authentication.NewAuthenticator(githubClient, log)
 
 	if err := authenticator.Authenticate(ctx, cfg.AuthInterval, cfg.AuthRefreshBuffer); err != nil {
-		return fmt.Errorf("failed to authenticate with github API: %w", err)
+		return nil, fmt.Errorf("failed to authenticate with github API: %w", err)
 	}
 
 	log.Info("Initializing routes")
@@ -73,13 +102,11 @@ func RunServer(
 	router.HandleFunc("/ping", handler.Pong)
 	// Initialize web server and configure the following routes:
 	router.HandleFunc("/repos", handler.Repos(log, githubClient, cfg.WorkerCount))
-	// GET /stats
 
 	log = log.WithField("port", cfg.Port)
-	log.Info("Listening...")
-	err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), router)
-	if err != nil {
-		return fmt.Errorf("Failed to listen to the given port: %d", cfg.Port)
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Port),
+		Handler: router,
 	}
-	return nil
+	return server, nil
 }
